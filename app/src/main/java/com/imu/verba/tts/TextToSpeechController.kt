@@ -66,6 +66,9 @@ class TextToSpeechController(
     val currentVoice: Voice? get() = _currentVoice
 
     private var pausedAtIndex: Int? = null
+    
+    /** Context-aware text preprocessor for natural pronunciation */
+    val preprocessor = TtsSpeechPreprocessor()
 
     init {
         tts = TextToSpeech(context.applicationContext) { status ->
@@ -129,15 +132,70 @@ class TextToSpeechController(
         return tts?.voices
             ?.filter { !it.isNetworkConnectionRequired && !it.features.contains("notInstalled") }
             ?.map { voice ->
+                // Extract meaningful voice name from the raw voice name
+                // Format is often like "en-us-x-sfg#male_1-local" or "en-GB-language"
+                val rawName = voice.name
+                val displayName = extractVoiceName(rawName, voice.locale)
+                
                 TtsVoice(
                     voice = voice,
-                    displayName = voice.name.substringAfterLast("-").substringBefore("#")
-                        .replaceFirstChar { it.uppercase() },
+                    displayName = displayName,
                     languageDisplay = voice.locale.displayName
                 )
             }
             ?.sortedBy { it.languageDisplay }
             ?: emptyList()
+    }
+    
+    /**
+     * Extract a user-friendly voice name from the raw TTS voice identifier.
+     */
+    private fun extractVoiceName(rawName: String, locale: Locale): String {
+        // Common patterns:
+        // "en-us-x-sfg#male_1-local" -> "Male 1"
+        // "en-us-x-tpf#female_2-local" -> "Female 2"
+        // "en-GB-language" -> "GB Voice"
+        // "cmn-cn-x-ccc#female_2-local" -> "Female 2"
+        
+        // Try to extract gender and number
+        val genderMatch = Regex("""(male|female)[\s_#-]*(\d*)""", RegexOption.IGNORE_CASE)
+            .find(rawName.lowercase())
+        
+        if (genderMatch != null) {
+            val gender = genderMatch.groupValues[1].replaceFirstChar { it.uppercase() }
+            val number = genderMatch.groupValues[2]
+            val voiceNum = if (number.isNotEmpty()) " $number" else ""
+            return "$gender Voice$voiceNum"
+        }
+        
+        // Try to extract quality descriptors
+        val qualityPatterns = listOf(
+            "hq" to "High Quality",
+            "premium" to "Premium",
+            "enhanced" to "Enhanced",
+            "standard" to "Standard",
+            "compact" to "Compact"
+        )
+        
+        for ((pattern, label) in qualityPatterns) {
+            if (rawName.lowercase().contains(pattern)) {
+                return "$label Voice"
+            }
+        }
+        
+        // Try to extract a short identifier from after the locale
+        val parts = rawName.split("-", "#", "_")
+        val meaningfulPart = parts.find { 
+            it.length in 2..10 && 
+            !it.all { c -> c.isDigit() } && 
+            it.lowercase() !in listOf("local", "x", locale.language, locale.country.lowercase())
+        }
+        
+        return if (meaningfulPart != null) {
+            meaningfulPart.replaceFirstChar { it.uppercase() } + " Voice"
+        } else {
+            "${locale.displayLanguage} Voice"
+        }
     }
 
     /**
@@ -246,8 +304,10 @@ class TextToSpeechController(
         }
 
         val (blockId, text) = blocks[currentIndex]
+        // Apply context-aware preprocessing for natural pronunciation
+        val processedText = preprocessor.preprocess(text)
         tts?.speak(
-            text,
+            processedText,
             TextToSpeech.QUEUE_FLUSH,
             null,
             blockId.toString()

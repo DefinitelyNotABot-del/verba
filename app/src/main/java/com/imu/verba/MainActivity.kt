@@ -30,6 +30,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.imu.verba.storage.FileAccessHelper
 import com.imu.verba.ui.reader.ReaderScreen
 import com.imu.verba.ui.settings.SettingsScreen
+import com.imu.verba.ui.theme.ThemeManager
+import com.imu.verba.ui.theme.ThemeMode
 import com.imu.verba.ui.theme.VerbaTheme
 import com.imu.verba.viewmodel.ReaderViewModel
 
@@ -37,8 +39,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Initialize theme manager
+        ThemeManager.init(applicationContext)
+        
         setContent {
-            VerbaTheme {
+            // Observe theme changes
+            val themeMode by ThemeManager.themeMode.collectAsState()
+            
+            VerbaTheme(darkTheme = themeMode == ThemeMode.DARK) {
                 VerbaApp(applicationContext = applicationContext)
             }
         }

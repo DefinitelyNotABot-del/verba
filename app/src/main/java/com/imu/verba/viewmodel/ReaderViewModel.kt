@@ -14,6 +14,7 @@ import com.imu.verba.tts.TextToSpeechController
 import com.imu.verba.tts.TtsCallback
 import com.imu.verba.tts.TtsPlaybackState
 import com.imu.verba.tts.TtsVoice
+import com.imu.verba.tts.DocumentContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,7 +35,8 @@ data class ReaderUiState(
     val playbackState: TtsPlaybackState = TtsPlaybackState.IDLE,
     val speechRate: Float = 1.0f,
     val availableVoices: List<TtsVoice> = emptyList(),
-    val currentVoice: Voice? = null
+    val currentVoice: Voice? = null,
+    val detectedContext: DocumentContext = DocumentContext.GENERAL
 )
 
 /**
@@ -95,10 +97,16 @@ class ReaderViewModel(
 
             result.fold(
                 onSuccess = { document ->
+                    // Detect document context for TTS preprocessing
+                    val fullText = document.blocks.joinToString(" ") { it.text }
+                    val detectedContext = ttsController?.preprocessor?.detectContext(fullText) 
+                        ?: DocumentContext.GENERAL
+                    
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         document = document,
-                        error = null
+                        error = null,
+                        detectedContext = detectedContext
                     )
                 },
                 onFailure = { error ->
@@ -204,6 +212,15 @@ class ReaderViewModel(
     fun setVoice(voice: Voice) {
         ttsController?.setVoice(voice)
         _uiState.value = _uiState.value.copy(currentVoice = voice)
+    }
+
+    /**
+     * Manually set the document context for TTS pronunciation.
+     * Overrides auto-detection.
+     */
+    fun setDocumentContext(context: DocumentContext) {
+        ttsController?.preprocessor?.setContext(context)
+        _uiState.value = _uiState.value.copy(detectedContext = context)
     }
 
     // TtsCallback implementation

@@ -20,6 +20,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Speed
@@ -33,11 +35,13 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +53,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.imu.verba.tts.TtsVoice
+import com.imu.verba.ui.theme.ThemeManager
+import com.imu.verba.ui.theme.ThemeMode
 
 /**
  * Obsidian-style settings screen with grouped sections.
@@ -119,11 +125,11 @@ fun SettingsScreen(
             }
 
             item {
-                SettingsItem(
-                    icon = Icons.Default.Palette,
-                    title = "Theme",
-                    subtitle = "System default",
-                    onClick = { /* TODO: Theme picker */ }
+                val currentTheme by ThemeManager.themeMode.collectAsState()
+                
+                ThemeToggleItem(
+                    isDarkMode = currentTheme == ThemeMode.DARK,
+                    onToggle = { ThemeManager.toggle() }
                 )
             }
 
@@ -239,6 +245,50 @@ private fun SettingsDivider() {
         modifier = Modifier.padding(start = 56.dp),
         color = MaterialTheme.colorScheme.outlineVariant
     )
+}
+
+@Composable
+private fun ThemeToggleItem(
+    isDarkMode: Boolean,
+    onToggle: () -> Unit
+) {
+    Surface(
+        onClick = onToggle,
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Dark Mode",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = if (isDarkMode) "On" else "Off",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Switch(
+                checked = isDarkMode,
+                onCheckedChange = { onToggle() }
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

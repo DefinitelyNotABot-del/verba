@@ -23,10 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -98,9 +94,6 @@ fun ReaderScreen(
                 onPlay = { viewModel.play() },
                 onPause = { viewModel.pause() },
                 onResume = { viewModel.resume() },
-                onStop = { viewModel.stop() },
-                onSpeedChange = { rate -> viewModel.setSpeechRate(rate) },
-                onVoiceSelect = { voice -> viewModel.setVoice(voice) },
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
@@ -335,7 +328,8 @@ private fun RangeMarker(text: String, isStart: Boolean) {
 }
 
 /**
- * Slim bottom TTS control bar - like a media player.
+ * Slim bottom TTS control bar - minimal like a podcast player.
+ * Just play/pause - all other settings are in Settings screen.
  */
 @Composable
 private fun TtsControlBar(
@@ -343,10 +337,6 @@ private fun TtsControlBar(
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
-    onStop: () -> Unit,
-    onSpeedChange: (Float) -> Unit,
-    onVoiceSelect: (android.speech.tts.Voice) -> Unit,
-    onSettingsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -358,170 +348,59 @@ private fun TtsControlBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.Center
         ) {
-            // Speed button
-            SpeedButton(
-                currentSpeed = uiState.speechRate,
-                onSpeedChange = onSpeedChange
+            // Document context indicator (small, subtle)
+            Text(
+                text = when (uiState.detectedContext) {
+                    com.imu.verba.tts.DocumentContext.TECHNICAL -> "Tech"
+                    com.imu.verba.tts.DocumentContext.MEDICAL -> "Medical"
+                    com.imu.verba.tts.DocumentContext.GENERAL -> ""
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
             )
-
-            // Center playback controls
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            
+            // Main play/pause button - prominent
+            IconButton(
+                onClick = {
+                    when (uiState.playbackState) {
+                        TtsPlaybackState.IDLE -> onPlay()
+                        TtsPlaybackState.PLAYING -> onPause()
+                        TtsPlaybackState.PAUSED -> onResume()
+                    }
+                },
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
             ) {
-                // Stop button (only when playing or paused)
-                if (uiState.playbackState != TtsPlaybackState.IDLE) {
-                    IconButton(onClick = onStop) {
-                        Icon(
-                            imageVector = Icons.Default.Stop,
-                            contentDescription = "Stop",
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-
-                // Main play/pause button
-                IconButton(
-                    onClick = {
-                        when (uiState.playbackState) {
-                            TtsPlaybackState.IDLE -> onPlay()
-                            TtsPlaybackState.PLAYING -> onPause()
-                            TtsPlaybackState.PAUSED -> onResume()
-                        }
+                Icon(
+                    imageVector = when (uiState.playbackState) {
+                        TtsPlaybackState.PLAYING -> Icons.Default.Pause
+                        else -> Icons.Default.PlayArrow
                     },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                ) {
-                    Icon(
-                        imageVector = when (uiState.playbackState) {
-                            TtsPlaybackState.PLAYING -> Icons.Default.Pause
-                            else -> Icons.Default.PlayArrow
-                        },
-                        contentDescription = when (uiState.playbackState) {
-                            TtsPlaybackState.PLAYING -> "Pause"
-                            else -> "Play"
-                        },
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-
-            // Voice selector
-            VoiceButton(
-                uiState = uiState,
-                onVoiceSelect = onVoiceSelect
-            )
-        }
-    }
-}
-
-@Composable
-private fun SpeedButton(
-    currentSpeed: Float,
-    onSpeedChange: (Float) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f)
-
-    Box {
-        Surface(
-            onClick = { expanded = true },
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Text(
-                text = "${currentSpeed}x",
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-            )
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            speeds.forEach { speed ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = "${speed}x",
-                            fontWeight = if (speed == currentSpeed) FontWeight.Bold else FontWeight.Normal
-                        )
+                    contentDescription = when (uiState.playbackState) {
+                        TtsPlaybackState.PLAYING -> "Pause"
+                        TtsPlaybackState.PAUSED -> "Resume"
+                        TtsPlaybackState.IDLE -> "Play"
                     },
-                    onClick = {
-                        onSpeedChange(speed)
-                        expanded = false
-                    }
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(32.dp)
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun VoiceButton(
-    uiState: ReaderUiState,
-    onVoiceSelect: (android.speech.tts.Voice) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box {
-        Surface(
-            onClick = { expanded = true },
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            shape = RoundedCornerShape(8.dp)
-        ) {
+            
+            // Speed indicator (read-only, set in Settings)
             Text(
-                text = "Voice",
+                text = "${uiState.speechRate}x",
                 style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.End
             )
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            if (uiState.availableVoices.isEmpty()) {
-                DropdownMenuItem(
-                    text = { Text("No voices available") },
-                    onClick = { expanded = false }
-                )
-            } else {
-                uiState.availableVoices.take(15).forEach { ttsVoice ->
-                    DropdownMenuItem(
-                        text = {
-                            Column {
-                                Text(
-                                    text = ttsVoice.displayName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (ttsVoice.voice == uiState.currentVoice)
-                                        FontWeight.Bold else FontWeight.Normal,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = ttsVoice.languageDisplay,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
-                                )
-                            }
-                        },
-                        onClick = {
-                            onVoiceSelect(ttsVoice.voice)
-                            expanded = false
-                        }
-                    )
-                }
-            }
         }
     }
 }
