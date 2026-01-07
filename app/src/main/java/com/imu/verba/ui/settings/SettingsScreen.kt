@@ -25,6 +25,9 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -37,24 +40,31 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.imu.verba.tts.TtsVoice
+import kotlinx.coroutines.launch
 import com.imu.verba.ui.theme.ThemeManager
 import com.imu.verba.ui.theme.ThemeMode
+import com.imu.verba.update.ReleaseInfo
+import com.imu.verba.update.UpdateManager
 
 /**
  * Obsidian-style settings screen with grouped sections.
@@ -144,10 +154,60 @@ fun SettingsScreen(
                 SettingsItem(
                     icon = Icons.AutoMirrored.Filled.VolumeUp,
                     title = "Verba",
-                    subtitle = "Version 1.0",
+                    subtitle = "Version ${UpdateManager.getCurrentVersion()}",
                     showChevron = false,
                     onClick = { }
                 )
+            }
+            
+            item {
+                val context = LocalContext.current
+                val coroutineScope = rememberCoroutineScope()
+                var isChecking by remember { mutableStateOf(false) }
+                var updateResult by remember { mutableStateOf<ReleaseInfo?>(null) }
+                var showUpdateDialog by remember { mutableStateOf(false) }
+                var updateError by remember { mutableStateOf<String?>(null) }
+                
+                UpdateCheckItem(
+                    isChecking = isChecking,
+                    onCheckClick = {
+                        coroutineScope.launch {
+                            isChecking = true
+                            updateError = null
+                            val result = UpdateManager.checkForUpdates()
+                            isChecking = false
+                            result.fold(
+                                onSuccess = { release ->
+                                    updateResult = release
+                                    if (release != null) {
+                                        showUpdateDialog = true
+                                    } else {
+                                        updateError = "You're up to date!"
+                                    }
+                                },
+                                onFailure = { e ->
+                                    updateError = "Failed to check: ${e.message}"
+                                }
+                            )
+                        }
+                    },
+                    statusMessage = updateError
+                )
+                
+                if (showUpdateDialog && updateResult != null) {
+                    UpdateAvailableDialog(
+                        releaseInfo = updateResult!!,
+                        onDismiss = { showUpdateDialog = false },
+                        onDownload = {
+                            UpdateManager.downloadApk(context, updateResult!!)
+                            showUpdateDialog = false
+                        },
+                        onViewRelease = {
+                            UpdateManager.openReleasePage(context, updateResult!!)
+                            showUpdateDialog = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -186,6 +246,95 @@ private fun SettingsSectionHeader(title: String) {
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp)
+    )
+}
+
+@Composable
+private fun UpdateCheckItem(
+    isChecking: Boolean,
+    onCheckClick: () -> Unit,
+    statusMessage: String?
+) {
+    Surface(
+        onClick = { if (!isChecking) onCheckClick() },
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.SystemUpdate,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Check for Updates",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = statusMessage ?: "Tap to check for new versions",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            if (isChecking) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateAvailableDialog(
+    releaseInfo: ReleaseInfo,
+    onDismiss: () -> Unit,
+    onDownload: () -> Unit,
+    onViewRelease: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Update Available") },
+        text = {
+            Column {
+                Text(
+                    text = "Version ${releaseInfo.tagName}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = releaseInfo.body.take(300) + if (releaseInfo.body.length > 300) "..." else "",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDownload) {
+                Text("Download")
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onDismiss) {
+                    Text("Later")
+                }
+                TextButton(onClick = onViewRelease) {
+                    Text("View Release")
+                }
+            }
+        }
     )
 }
 

@@ -15,6 +15,7 @@ import com.imu.verba.tts.TtsCallback
 import com.imu.verba.tts.TtsPlaybackState
 import com.imu.verba.tts.TtsVoice
 import com.imu.verba.tts.DocumentContext
+import com.imu.verba.ui.reader.DisplayMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,7 +37,8 @@ data class ReaderUiState(
     val speechRate: Float = 1.0f,
     val availableVoices: List<TtsVoice> = emptyList(),
     val currentVoice: Voice? = null,
-    val detectedContext: DocumentContext = DocumentContext.GENERAL
+    val detectedContext: DocumentContext = DocumentContext.GENERAL,
+    val displayMode: DisplayMode = DisplayMode.READ
 )
 
 /**
@@ -221,6 +223,24 @@ class ReaderViewModel(
     fun setDocumentContext(context: DocumentContext) {
         ttsController?.preprocessor?.setContext(context)
         _uiState.value = _uiState.value.copy(detectedContext = context)
+    }
+
+    /**
+     * Toggle between Read and Edit display modes.
+     */
+    fun toggleDisplayMode() {
+        val newMode = when (_uiState.value.displayMode) {
+            DisplayMode.READ -> DisplayMode.EDIT
+            DisplayMode.EDIT -> DisplayMode.READ
+        }
+        _uiState.value = _uiState.value.copy(displayMode = newMode)
+    }
+
+    /**
+     * Set display mode directly.
+     */
+    fun setDisplayMode(mode: DisplayMode) {
+        _uiState.value = _uiState.value.copy(displayMode = mode)
     }
 
     // TtsCallback implementation

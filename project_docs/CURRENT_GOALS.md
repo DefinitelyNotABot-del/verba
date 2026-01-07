@@ -23,15 +23,16 @@ Refine the user interface, remove redundant controls, fix theme toggle, add read
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Remove stop button from TTS bar | ⬜ Pending | Keep only play/pause |
-| Remove bottom Voice/Speed buttons | ⬜ Pending | Settings handles these |
-| Fix voice name display | ⬜ Pending | Show engine name, not "Local" |
-| Fix theme toggle | ⬜ Pending | Light/Dark only |
-| Fix table rendering | ⬜ Pending | Proper bordered grid |
-| Add Read/Edit mode toggle | ⬜ Pending | VS Code/Obsidian style |
-| Add auto-update from GitHub | ⬜ Pending | Check releases for updates |
-| Push to GitHub | ⬜ Pending | DefinitelyNotABot-del/verba |
+| Remove stop button from TTS bar | ✅ Complete | Keep only play/pause |
+| Remove bottom Voice/Speed buttons | ✅ Complete | Settings handles these |
+| Fix voice name display | ✅ Complete | Show engine name, not "Local" |
+| Fix theme toggle | ✅ Complete | Light/Dark only |
+| Fix table rendering | ✅ Complete | Proper bordered grid |
+| Add Read/Edit mode toggle | ✅ Complete | VS Code/Obsidian style |
+| Add auto-update from GitHub | ✅ Complete | Check releases for updates |
+| Push to GitHub | ✅ Complete | DefinitelyNotABot-del/verba |
 | Create project_docs | ✅ Complete | SESSION_HISTORY + CURRENT_GOALS |
+| Context-aware TTS | ✅ Complete | ML=machine learning in tech docs |
 
 ---
 
